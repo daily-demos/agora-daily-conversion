@@ -1,6 +1,6 @@
 /*
- *  These procedures use Agora Video Call SDK for Web to enable local and remote
- *  users to join and leave a Video Call channel managed by Agora Platform.
+ *  These procedures use Daily's Client SDK for JavaScript to enable local and remote
+ *  users to join and leave a video call room managed by Daily.
  */
 
 /*
@@ -69,55 +69,36 @@ var videoProfiles = [{
   value: "1080p_2"
 }];
 var curVideoProfile;
-AgoraRTC.onAutoplayFailed = () => {
-  alert("click to start autoplay!");
-};
-AgoraRTC.onMicrophoneChanged = async changedDevice => {
-  // When plugging in a device, switch to a device that is newly plugged in.
-  if (changedDevice.state === "ACTIVE") {
-    localTracks.audioTrack.setDevice(changedDevice.device.deviceId);
-    // Switch to an existing device when the current device is unplugged.
-  } else if (changedDevice.device.label === localTracks.audioTrack.getTrackLabel()) {
-    const oldMicrophones = await AgoraRTC.getMicrophones();
-    oldMicrophones[0] && localTracks.audioTrack.setDevice(oldMicrophones[0].deviceId);
-  }
-};
-AgoraRTC.onCameraChanged = async changedDevice => {
-  // When plugging in a device, switch to a device that is newly plugged in.
-  if (changedDevice.state === "ACTIVE") {
-    localTracks.videoTrack.setDevice(changedDevice.device.deviceId);
-    // Switch to an existing device when the current device is unplugged.
-  } else if (changedDevice.device.label === localTracks.videoTrack.getTrackLabel()) {
-    const oldCameras = await AgoraRTC.getCameras();
-    oldCameras[0] && localTracks.videoTrack.setDevice(oldCameras[0].deviceId);
-  }
-};
+
 async function initDevices() {
-  if (!localTracks.audioTrack) {
-    localTracks.audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
-      encoderConfig: "music_standard"
-    });
-  }
-  if (!localTracks.videoTrack) {
-    localTracks.videoTrack = await AgoraRTC.createCameraVideoTrack({
-      encoderConfig: curVideoProfile.value
-    });
-  }
+  client.preAuth();
+  client.startCamera();
+  
   // get mics
-  mics = await AgoraRTC.getMicrophones();
-  const audioTrackLabel = localTracks.audioTrack.getTrackLabel();
-  currentMic = mics.find(item => item.label === audioTrackLabel);
-  $(".mic-input").val(currentMic.label);
+  const devices = await client.enumerateDevices();
+  console.log("devices:", devices, client.local, client.participants().local);
+
+  let mics = [];
+  let cams = [];
+
+  for (let i = 0; i < devices.length; i += 1){
+    const device = devices[i];
+    console.log("device:", device)
+    const kind = device.kind;
+    if (kind === "audioinput") {
+      mics.push(device);
+    } else if (kind === "videoinput") {
+      cams.push(device);
+    }
+  }
+  $(".mic-input").val("currentMic");
   $(".mic-list").empty();
   mics.forEach(mic => {
     $(".mic-list").append(`<a class="dropdown-item" href="#">${mic.label}</a>`);
   });
 
   // get cameras
-  cams = await AgoraRTC.getCameras();
-  const videoTrackLabel = localTracks.videoTrack.getTrackLabel();
-  currentCam = cams.find(item => item.label === videoTrackLabel);
-  $(".cam-input").val(currentCam.label);
+  $(".cam-input").val("currentCam");
   $(".cam-list").empty();
   cams.forEach(cam => {
     $(".cam-list").append(`<a class="dropdown-item" href="#">${cam.label}</a>`);
@@ -127,13 +108,17 @@ async function switchCamera(label) {
   currentCam = cams.find(cam => cam.label === label);
   $(".cam-input").val(currentCam.label);
   // switch device of local video track.
-  await localTracks.videoTrack.setDevice(currentCam.deviceId);
+  client.setInputDevicesAsync({
+    videoSource: currentCam.deviceId,  
+  });
 }
 async function switchMicrophone(label) {
   currentMic = mics.find(mic => mic.label === label);
   $(".mic-input").val(currentMic.label);
   // switch device of local audio track.
-  await localTracks.audioTrack.setDevice(currentMic.deviceId);
+  client.setInputDevicesAsync({
+    videoSource: currentMic.deviceId,  
+  });
 }
 function initVideoProfiles() {
   videoProfiles.forEach(profile => {
@@ -154,6 +139,29 @@ async function changeVideoProfile(label) {
  * attempts to join a Video Call channel using those parameters.
  */
 $(() => {
+  if (!client) {
+    client = DailyIframe.createCallObject();
+    // Add an event listener to play remote tracks when remote user publishes.
+    client.on("participant-joined", (ev) => {
+      handleUserPublished(ev.participant.session_id);
+    });
+    client.on("participant-left", (ev) => {
+      handleUserUnpublished(ev.participant.session_id);
+    });
+    client.on("track-started", (ev) => {
+      const p = ev.participant;
+      const track = ev.track;
+      updateMedia(p.session_id, track, p.local);
+    });
+    client.on("track-stopped", (ev) => {
+      const p = ev.participant;
+      const track = ev.track;
+      if (track.kind === "video") {
+        removeVideoTrack(p.session_id, track, p.local);
+      }
+    })
+  }
+
   initVideoProfiles();
   $(".profile-list").delegate("a", "click", function (e) {
     changeVideoProfile(this.getAttribute("label"));
@@ -181,12 +189,6 @@ $("#join-form").submit(async function (e) {
   e.preventDefault();
   $("#join").attr("disabled", true);
   try {
-    if (!client) {
-      client = AgoraRTC.createClient({
-        mode: "rtc",
-        codec: getCodec()
-      });
-    }
     options.channel = $("#channel").val();
     options.uid = Number($("#uid").val());
     options.appid = $("#appid").val();
@@ -225,12 +227,11 @@ $(".mic-list").delegate("a", "click", function (e) {
  * Join a channel, then create local video and audio tracks and publish them to the channel.
  */
 async function join() {
-  // Add an event listener to play remote tracks when remote user publishes.
-  client.on("user-published", handleUserPublished);
-  client.on("user-unpublished", handleUserUnpublished);
   // Join the channel.
-  options.uid = await client.join(options.appid, options.channel, options.token || null, options.uid || null);
-  if (!localTracks.audioTrack) {
+  options.uid = await client.join({
+    url: "https://lizashul.daily.co/christian",
+  });
+  /*if (!localTracks.audioTrack) {
     localTracks.audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
       encoderConfig: "music_standard"
     });
@@ -242,8 +243,8 @@ async function join() {
   }
 
   // Play the local video track to the local browser and update the UI with the user ID.
-  localTracks.videoTrack.play("local-player");
-  $("#local-player-name").text(`localVideo(${options.uid})`);
+  localTracks.videoTrack.play("local-player"); */
+  $("#local-player-name").text(`localVideo(${options.uid})`); 
   $("#joined-setup").css("display", "flex");
 
   // Publish the local video and audio tracks to the channel.
@@ -283,23 +284,95 @@ async function leave() {
  * @param  {IAgoraRTCRemoteUser} user - The {@link  https://docs.agora.io/en/Voice/API%20Reference/web_ng/interfaces/iagorartcremoteuser.html| remote user} to add.
  * @param {trackMediaType - The {@link https://docs.agora.io/en/Voice/API%20Reference/web_ng/interfaces/itrack.html#trackmediatype | media type} to add.
  */
-async function subscribe(user, mediaType) {
-  const uid = user.uid;
+async function subscribe(user) {
+  const uid = user.session_id;
+
+  // Set up user's player
+  createPlayerWrapper(uid);
+
   // subscribe to a remote user
-  await client.subscribe(user, mediaType);
-  console.log("subscribe success");
-  if (mediaType === "video") {
-    const player = $(`
+  client.updateParticipant(user.session_id, {
+    setSubscribedTracks: { audio: true, video: true }
+  });
+}
+
+function createPlayerWrapper(uid) {
+  const player = $(`
       <div id="player-wrapper-${uid}">
         <p class="player-name">remoteUser(${uid})</p>
-        <div id="player-${uid}" class="player"></div>
+        <div id="${getPlayerContainerID(uid)}" class="player">
+          <video playsinline="true" autoplay="true"></video>
+          <audio autoplay="true"></audio>
+        </div>
       </div>
     `);
     $("#remote-playerlist").append(player);
-    user.videoTrack.play(`player-${uid}`);
+}
+
+function getPlayerContainer(uid, isLocal) {
+  let id = "local-player"
+  if (!isLocal) {
+    getPlayerContainerID(uid)
   }
-  if (mediaType === "audio") {
-    user.audioTrack.play();
+  return document.getElementById(id)
+}
+ 
+function getPlayerContainerID(uid) {
+  return `player-${uid}`;
+}
+
+function updateMedia(uid, track, isLocal) {
+  const tagName = track.kind;
+  if (tagName !== "video") {
+    if (isLocal || tagName !== "audio") {
+      return;
+    }
+  }
+  
+  let playerContainer = getPlayerContainer(uid, isLocal);
+  if (!playerContainer) {
+    console.log("playercontainer:", playerContainer)
+    createPlayerWrapper(uid);
+    playerContainer = getPlayerContainer(uid);
+  }
+  console.log("playerContainer.", playerContainer, tagName, isLocal)
+
+  const mediaEles = playerContainer.getElementsByTagName(tagName)
+  const ele = mediaEles[0];
+  updateTracksIfNeeded(ele, track)
+}
+
+function removeVideoTrack(uid, videoTrack) {
+  let playerContainer = getPlayerContainer(uid);
+  if (!playerContaienr) {
+    createPlayerWrapper(uid);
+    playerContainer = getPlayerContainer(uid);
+  }
+  const videoEle = playerContainer.getElementsByTagName("video");
+  const src = videoEle.srcObject;
+  if (!src) return;
+  src.removeTrack(videoTrack);
+}
+
+function updateTracksIfNeeded(mediaEle, newTrack) {
+  const src = mediaEle.srcObject;
+  if (!src) {
+    mediaEle.srcObject = new MediaStream([newTrack]);
+    return;
+  }
+  const allTracks = src.getTracks();
+  const l = allTracks.length;
+  if (l === 0) {
+    src.addTrack(newTrack);
+    return;
+  }
+  if (l > 1) {
+    console.warn(`Expected 1 track, got ${l}. Only working with the first.`)
+  }
+  const existingTrack = allTracks[0];
+  if (existingTrack.id !== newTrack.id) {
+    src.removeTrack(existingTrack);
+    src.addTrack(newTrack);
   }
 }
 
@@ -309,10 +382,10 @@ async function subscribe(user, mediaType) {
  * @param  {IAgoraRTCRemoteUser} user - The {@link  https://docs.agora.io/en/Voice/API%20Reference/web_ng/interfaces/iagorartcremoteuser.html| remote user} to add.
  * @param {trackMediaType - The {@link https://docs.agora.io/en/Voice/API%20Reference/web_ng/interfaces/itrack.html#trackmediatype | media type} to add.
  */
-function handleUserPublished(user, mediaType) {
+function handleUserPublished(user) {
   const id = user.uid;
   remoteUsers[id] = user;
-  subscribe(user, mediaType);
+  subscribe(user);
 }
 
 /*
@@ -320,13 +393,12 @@ function handleUserPublished(user, mediaType) {
  *
  * @param  {string} user - The {@link  https://docs.agora.io/en/Voice/API%20Reference/web_ng/interfaces/iagorartcremoteuser.html| remote user} to remove.
  */
-function handleUserUnpublished(user, mediaType) {
-  if (mediaType === "video") {
-    const id = user.uid;
-    delete remoteUsers[id];
-    $(`#player-wrapper-${id}`).remove();
-  }
+function handleUserUnpublished(user) {
+  const id = user.session_id;
+  delete remoteUsers[id];
+  $(`#player-wrapper-${id}`).remove();
 }
+
 function getCodec() {
   var radios = document.getElementsByName("radios");
   var value;
