@@ -34,36 +34,93 @@ var options = {
 var videoProfiles = [{
   label: "360p_7",
   detail: "480×360, 15fps, 320Kbps",
-  value: "360p_7"
+  value: { 
+    kbs: 320, 
+    trackConstraints: { 
+      width: 480,
+      height: 360,
+      frameRate: 15,
+    } 
+  }
 }, {
   label: "360p_8",
   detail: "480×360, 30fps, 490Kbps",
-  value: "360p_8"
+  value: { 
+    kbs: 490, 
+    trackConstraints: { 
+      width: 480,
+      height: 360,
+      frameRate: 30,
+    } 
+  }
 }, {
   label: "480p_1",
   detail: "640×480, 15fps, 500Kbps",
-  value: "480p_1"
+  value: { 
+    kbs: 500, 
+    trackConstraints: { 
+      width: 480,
+      height: 370,
+      frameRate: 15,
+    } 
+  }
 }, {
   label: "480p_2",
   detail: "640×480, 30fps, 1000Kbps",
-  value: "480p_2"
+  value: { 
+    kbs: 1000, 
+    trackConstraints: { 
+      width: 640,
+      height: 480,
+      frameRate: 30,
+    } 
+  }
 }, {
   label: "720p_1",
   detail: "1280×720, 15fps, 1130Kbps",
-  value: "720p_1"
+  value: { 
+    kbs: 1130, 
+    trackConstraints: { 
+      width: 1280,
+      height: 720,
+      frameRate: 15,
+    } 
+  }
 }, {
   label: "720p_2",
   detail: "1280×720, 30fps, 2000Kbps",
-  value: "720p_2"
+  value: { 
+    kbs: 2000, 
+    trackConstraints: { 
+      width: 1280,
+      height: 720,
+      frameRate: 30,
+    } 
+  }
 }, {
   label: "1080p_1",
   detail: "1920×1080, 15fps, 2080Kbps",
-  value: "1080p_1"
+  value: { 
+    kbs: 2080, 
+    trackConstraints: { 
+      width: 1920,
+      height: 1080,
+      frameRate: 15,
+    } 
+  }
 }, {
   label: "1080p_2",
   detail: "1920×1080, 30fps, 3000Kbps",
-  value: "1080p_2"
+  value: { 
+    kbs: 3000, 
+    trackConstraints: { 
+      width: 1920,
+      height: 1080,
+      frameRate: 30,
+    } 
+  }
 }];
+
 var curVideoProfile;
 
 let mics = []
@@ -71,8 +128,11 @@ let cams = []
 
 
 async function initDevices() {
-  client.preAuth();
-  client.startCamera();
+  const meetingState = client.meetingState();
+  if (meetingState !== "joined-meeting" && meetingState !== "joining-meeting") {
+    client.preAuth();
+    client.startCamera();
+  }
   
   // Get mics
   client.enumerateDevices().then(devices => {
@@ -140,7 +200,7 @@ async function changeVideoProfile(label) {
   curVideoProfile = videoProfiles.find(profile => profile.label === label);
   $(".profile-input").val(`${curVideoProfile.detail}`);
   // change the local video track`s encoder configuration
-  localTracks.videoTrack && (await localTracks.videoTrack.setEncoderConfiguration(curVideoProfile.value));
+  client.setBandwidth(curVideoProfile.value);
 }
 
 /*
@@ -154,6 +214,9 @@ $(() => {
     });
       // Add an event listener to play remote tracks when remote user publishes.
     client
+      .on("joined-meeting", () => {
+        client.setBandwidth(curVideoProfile.value);
+      })
       .on("participant-joined", (ev) => {
         handleUserPublished(ev.participant.session_id);
       })
