@@ -4,6 +4,8 @@
 
 This repository contains demo code that was originally using the Agora RTC Web SDK 4.x, converted to Daily's video call API.
 
+![Screenshot of a basic call demo converted to Daily from Agora](screenshot.png)
+
 ## Steps to run
 
 ### Sign up for Daily and create a room
