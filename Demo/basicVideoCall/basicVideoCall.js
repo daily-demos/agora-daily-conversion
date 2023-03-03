@@ -189,7 +189,7 @@ async function switchMicrophone(label) {
 }
 
 // initVideoProfiles populates the UI showing 
-// user media constrait setting presets.
+// user media constraint setting presets.
 function initVideoProfiles() {
   videoProfiles.forEach(profile => {
     $(".profile-list").append(`<a class="dropdown-item" label="${profile.label}" href="#">${profile.label}: ${profile.detail}</a>`);
@@ -426,7 +426,7 @@ function getPlayerContainerID(uid) {
   return `player-${uid}`;
 }
 
-// updatMedia() updates the given user's media players
+// updateMedia() updates the given user's media players
 // with the provided track.
 function updateMedia(uid, track, isLocal) {
   const tagName = track.kind;
