@@ -9,6 +9,7 @@
  * @param {string} mode - The {@link https://docs.agora.io/en/Voice/API%20Reference/web_ng/interfaces/clientconfig.html#mode| streaming algorithm} used by Agora SDK.
  * @param  {string} codec - The {@link https://docs.agora.io/en/Voice/API%20Reference/web_ng/interfaces/clientconfig.html#codec| client codec} used by the browser.
  */
+
 var client;
 
 /*
@@ -18,11 +19,6 @@ var localTracks = {
   videoTrack: null,
   audioTrack: null
 };
-
-/*
- * On initiation no users are connected.
- */
-var remoteUsers = {};
 
 /*
  * On initiation. `client` is not attached to any project or channel for any specific user.
@@ -85,7 +81,6 @@ async function initDevices() {
 
   // Set up device change listener
   navigator.mediaDevices.addEventListener('devicechange', () => {
-    console.log("device changed!")
     client.enumerateDevices().then(devices => {
       updateDeviceSelection(devices);
     })
@@ -154,39 +149,42 @@ async function changeVideoProfile(label) {
  */
 $(() => {
   if (!client) {
-    client = DailyIframe.createCallObject();
+    client = DailyIframe.createCallObject( {
+      subscribeToTracksAutomatically: false,
+    });
       // Add an event listener to play remote tracks when remote user publishes.
-    client.on("participant-joined", (ev) => {
-      handleUserPublished(ev.participant.session_id);
-    });
-    client.on("participant-left", (ev) => {
-      handleUserUnpublished(ev.participant.session_id);
-    });
-    client.on("track-stopped", (ev) => {
-      const p = ev.participant;
-      const track = ev.track;
-      if (track.kind === "video") {
-        removeVideoTrack(p.session_id, track, p.local);
-      }
-    })
-    client.on("track-started", (ev) => {
-      const meetingState = client.meetingState();
-      const p = ev.participant;
-      const track = ev.track;
-      console.log("track:", track)
-      const kind = track.kind;
-      const label = track.label;
-      if (kind === "audio") {
-        $(".mic-input").val(label);
-      } else if (kind === "video") {
-        $(".cam-input").val(label);
-      }
+    client
+      .on("participant-joined", (ev) => {
+        handleUserPublished(ev.participant.session_id);
+      })
+      .on("participant-left", (ev) => {
+        handleUserUnpublished(ev.participant.session_id);
+      })
+      .on("track-stopped", (ev) => {
+        const p = ev.participant;
+        if (!p) return;
+        const track = ev.track;
+        if (track.kind === "video") {
+          removeVideoTrack(p.session_id, track, p.local);
+        }
+      })
+      .on("track-started", (ev) => {
+        const meetingState = client.meetingState();
+        const p = ev.participant;
+        const track = ev.track;
+        const kind = track.kind;
+        const label = track.label;
+        if (kind === "audio") {
+          $(".mic-input").val(label);
+        } else if (kind === "video") {
+          $(".cam-input").val(label);
+        }
 
-      // Only show media if already in the call
-      if (meetingState === "joined-meeting") {
-        updateMedia(p.session_id, track, p.local);
-      }
-    });
+        // Only show media if already in the call
+        if (meetingState === "joined-meeting" || meetingState === "joining-meeting") {
+          updateMedia(p.session_id, track, p.local);
+        }
+      });
   }
 
   initVideoProfiles();
@@ -218,6 +216,7 @@ $("#join-form").submit(async function (e) {
     options.uname = $("#uname").val();
     options.roomurl = $("#roomurl").val();
     options.token = $("#token").val();
+
     await join();
     if (options.token) {
       $("#success-alert-with-token").css("display", "block");
@@ -252,12 +251,15 @@ $(".mic-list").delegate("a", "click", function (e) {
  * Join a channel, then create local video and audio tracks and publish them to the channel.
  */
 async function join() {
-
+  const hook = getModifySdpHook(getCodec());
   const joinOptions = {
     url: options.roomurl,
     startAudioOff: false,
     startVideoOff: false,
     userName: "No name",
+    dailyConfig: {
+      modifyLocalSdpHook: hook,
+    }
   }
 
   const userName = options.uname;
@@ -268,6 +270,7 @@ async function join() {
   if (token) {
     joinOptions.token = token;
   }
+  
   // Join the channel.
   client.join(joinOptions);
   /*if (!localTracks.audioTrack) {
@@ -301,11 +304,14 @@ async function leave() {
   } */
 
   // Remove remote users and player views.
-  remoteUsers = {};
   $("#remote-playerlist").html("");
 
   // leave the channel
   await client.leave();
+  const container = getPlayerContainer(-1, true);
+  const mediaEle = getMediaEle(container, "video");
+  mediaEle.srcObject = null;
+
   $("#local-player-name").text("");
   $("#join").attr("disabled", false);
   $("#leave").attr("disabled", true);
@@ -319,19 +325,18 @@ async function leave() {
  * @param  {IAgoraRTCRemoteUser} user - The {@link  https://docs.agora.io/en/Voice/API%20Reference/web_ng/interfaces/iagorartcremoteuser.html| remote user} to add.
  * @param {trackMediaType - The {@link https://docs.agora.io/en/Voice/API%20Reference/web_ng/interfaces/itrack.html#trackmediatype | media type} to add.
  */
-async function subscribe(user) {
-  const uid = user.session_id;
-
+async function subscribe(uid) {
   // Set up user's player
   createPlayerWrapper(uid);
 
   // subscribe to a remote user
-  client.updateParticipant(user.session_id, {
+  client.updateParticipant(uid, {
     setSubscribedTracks: { audio: true, video: true }
   });
 }
 
 function createPlayerWrapper(uid) {
+  if (!uid) console.trace();
   const player = $(`
       <div id="player-wrapper-${uid}">
         <p class="player-name">remoteUser(${uid})</p>
@@ -347,9 +352,15 @@ function createPlayerWrapper(uid) {
 function getPlayerContainer(uid, isLocal) {
   let id = "local-player"
   if (!isLocal) {
-    getPlayerContainerID(uid)
+    id = getPlayerContainerID(uid)
   }
   return document.getElementById(id)
+}
+
+function getMediaEle(container, tagName) {
+  const allEles = container.getElementsByTagName(tagName);
+  if (allEles.length === 0) return;
+  return allEles[0];
 }
  
 function getPlayerContainerID(uid) {
@@ -370,8 +381,7 @@ function updateMedia(uid, track, isLocal) {
     playerContainer = getPlayerContainer(uid);
   }
 
-  const mediaEles = playerContainer.getElementsByTagName(tagName)
-  const ele = mediaEles[0];
+  const ele = getMediaEle(playerContainer, tagName);
   updateTracksIfNeeded(ele, track)
 }
 
@@ -381,16 +391,17 @@ function removeVideoTrack(uid, videoTrack) {
     createPlayerWrapper(uid);
     playerContainer = getPlayerContainer(uid);
   }
-  const videoEle = playerContainer.getElementsByTagName("video");
+  const videoEle = getMediaEle(playerContainer, "video");
   const src = videoEle.srcObject;
   if (!src) return;
   src.removeTrack(videoTrack);
 }
 
 function updateTracksIfNeeded(mediaEle, newTrack) {
-  const src = mediaEle.srcObject;
+  let src = mediaEle.srcObject;
   if (!src) {
     mediaEle.srcObject = new MediaStream([newTrack]);
+    src = mediaEle.srcObject;
     return;
   }
   const allTracks = src.getTracks();
@@ -416,8 +427,6 @@ function updateTracksIfNeeded(mediaEle, newTrack) {
  * @param {trackMediaType - The {@link https://docs.agora.io/en/Voice/API%20Reference/web_ng/interfaces/itrack.html#trackmediatype | media type} to add.
  */
 function handleUserPublished(user) {
-  const id = user.uid;
-  remoteUsers[id] = user;
   subscribe(user);
 }
 
@@ -426,9 +435,7 @@ function handleUserPublished(user) {
  *
  * @param  {string} user - The {@link  https://docs.agora.io/en/Voice/API%20Reference/web_ng/interfaces/iagorartcremoteuser.html| remote user} to remove.
  */
-function handleUserUnpublished(user) {
-  const id = user.session_id;
-  delete remoteUsers[id];
+function handleUserUnpublished(id) {
   $(`#player-wrapper-${id}`).remove();
 }
 
@@ -441,4 +448,45 @@ function getCodec() {
     }
   }
   return value;
+}
+
+
+// getModifySdpHook takes a desired codec and returns the given hook to pass
+// to Daily to prefer that codec.
+function getModifySdpHook(wantedCodec) {
+  if (wantedCodec === '') {
+    return null;
+  }
+  const valid = ['VP8', 'VP9', 'H264'];
+  const codecName = wantedCodec.toUpperCase();
+  if (!valid.includes(codecName)) {
+    throw new Error(
+      `invalid codec name supplied: ${wantedCodec}; valid options are: ${valid.join(
+        ' '
+      )}`
+    );
+  }
+  const hook = (rtcSDP) => {
+    try {
+      const camIdx = 0;
+      const parsed = sdpTransform.parse(rtcSDP.sdp);
+      const camMedia = parsed.media[camIdx];
+      const preferredCodec = camMedia.rtp.filter(
+        (r) => r.codec === codecName
+      );
+      const notPreferredCodec = camMedia.rtp.filter(
+        (r) => r.codec !== codecName
+      );
+      const newPayloads = [...preferredCodec, ...notPreferredCodec]
+        .map((r) => r.payload)
+        .join(' ');
+      parsed.media[camIdx].payloads = newPayloads;
+      const newSdp = sdpTransform.write(parsed);
+      return newSdp;
+    } catch (e) {
+      console.error(`failed to set codec preference: ${e}`);
+    }
+    return rtcSDP;
+  };
+  return hook;
 }
