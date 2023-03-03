@@ -70,20 +70,36 @@ var videoProfiles = [{
 }];
 var curVideoProfile;
 
+let mics = []
+let cams = []
+
+
 async function initDevices() {
   client.preAuth();
   client.startCamera();
   
-  // get mics
-  const devices = await client.enumerateDevices();
-  console.log("devices:", devices, client.local, client.participants().local);
+  // Get mics
+  client.enumerateDevices().then(devices => {
+    updateDeviceSelection(devices);
+  })
 
-  let mics = [];
-  let cams = [];
+  // Set up device change listener
+  navigator.mediaDevices.addEventListener('devicechange', () => {
+    console.log("device changed!")
+    client.enumerateDevices().then(devices => {
+      updateDeviceSelection(devices);
+    })
+  });
+}
 
-  for (let i = 0; i < devices.length; i += 1){
-    const device = devices[i];
-    console.log("device:", device)
+function updateDeviceSelection(devices) {
+  const d = devices.devices;
+
+  // Reset device list
+  mics = [];
+  cams = [];
+  for (let i = 0; i < d.length; i += 1){
+    const device = d[i];
     const kind = device.kind;
     if (kind === "audioinput") {
       mics.push(device);
@@ -91,14 +107,12 @@ async function initDevices() {
       cams.push(device);
     }
   }
-  $(".mic-input").val("currentMic");
   $(".mic-list").empty();
   mics.forEach(mic => {
     $(".mic-list").append(`<a class="dropdown-item" href="#">${mic.label}</a>`);
   });
 
   // get cameras
-  $(".cam-input").val("currentCam");
   $(".cam-list").empty();
   cams.forEach(cam => {
     $(".cam-list").append(`<a class="dropdown-item" href="#">${cam.label}</a>`);
@@ -117,7 +131,7 @@ async function switchMicrophone(label) {
   $(".mic-input").val(currentMic.label);
   // switch device of local audio track.
   client.setInputDevicesAsync({
-    videoSource: currentMic.deviceId,  
+    audioSource: currentMic.deviceId,  
   });
 }
 function initVideoProfiles() {
@@ -141,17 +155,12 @@ async function changeVideoProfile(label) {
 $(() => {
   if (!client) {
     client = DailyIframe.createCallObject();
-    // Add an event listener to play remote tracks when remote user publishes.
+      // Add an event listener to play remote tracks when remote user publishes.
     client.on("participant-joined", (ev) => {
       handleUserPublished(ev.participant.session_id);
     });
     client.on("participant-left", (ev) => {
       handleUserUnpublished(ev.participant.session_id);
-    });
-    client.on("track-started", (ev) => {
-      const p = ev.participant;
-      const track = ev.track;
-      updateMedia(p.session_id, track, p.local);
     });
     client.on("track-stopped", (ev) => {
       const p = ev.participant;
@@ -160,6 +169,24 @@ $(() => {
         removeVideoTrack(p.session_id, track, p.local);
       }
     })
+    client.on("track-started", (ev) => {
+      const meetingState = client.meetingState();
+      const p = ev.participant;
+      const track = ev.track;
+      console.log("track:", track)
+      const kind = track.kind;
+      const label = track.label;
+      if (kind === "audio") {
+        $(".mic-input").val(label);
+      } else if (kind === "video") {
+        $(".cam-input").val(label);
+      }
+
+      // Only show media if already in the call
+      if (meetingState === "joined-meeting") {
+        updateMedia(p.session_id, track, p.local);
+      }
+    });
   }
 
   initVideoProfiles();
@@ -167,15 +194,14 @@ $(() => {
     changeVideoProfile(this.getAttribute("label"));
   });
   var urlParams = new URL(location.href).searchParams;
-  options.appid = urlParams.get("appid");
+  options.roomurl = urlParams.get("roomurl");
   options.channel = urlParams.get("channel");
   options.token = urlParams.get("token");
-  options.uid = urlParams.get("uid");
-  if (options.appid && options.channel) {
-    $("#uid").val(options.uid);
-    $("#appid").val(options.appid);
+  options.uname = urlParams.get("uname");
+  if (options.roomurl) {
+    $("#uname").val(options.uname);
+    $("#roomurl").val(options.roomurl);
     $("#token").val(options.token);
-    $("#channel").val(options.channel);
     $("#join-form").submit();
   }
 });
@@ -189,15 +215,14 @@ $("#join-form").submit(async function (e) {
   e.preventDefault();
   $("#join").attr("disabled", true);
   try {
-    options.channel = $("#channel").val();
-    options.uid = Number($("#uid").val());
-    options.appid = $("#appid").val();
+    options.uname = $("#uname").val();
+    options.roomurl = $("#roomurl").val();
     options.token = $("#token").val();
     await join();
     if (options.token) {
       $("#success-alert-with-token").css("display", "block");
     } else {
-      $("#success-alert a").attr("href", `index.html?appid=${options.appid}&channel=${options.channel}&token=${options.token}`);
+      $("#success-alert a").attr("href", `index.html?roomurl=${options.roomurl}`);
       $("#success-alert").css("display", "block");
     }
   } catch (error) {
@@ -227,10 +252,24 @@ $(".mic-list").delegate("a", "click", function (e) {
  * Join a channel, then create local video and audio tracks and publish them to the channel.
  */
 async function join() {
+
+  const joinOptions = {
+    url: options.roomurl,
+    startAudioOff: false,
+    startVideoOff: false,
+    userName: "No name",
+  }
+
+  const userName = options.uname;
+  if (userName) {
+    joinOptions.userName = userName;
+  }
+  const token = options.token;
+  if (token) {
+    joinOptions.token = token;
+  }
   // Join the channel.
-  options.uid = await client.join({
-    url: "https://lizashul.daily.co/christian",
-  });
+  client.join(joinOptions);
   /*if (!localTracks.audioTrack) {
     localTracks.audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
       encoderConfig: "music_standard"
@@ -244,26 +283,22 @@ async function join() {
 
   // Play the local video track to the local browser and update the UI with the user ID.
   localTracks.videoTrack.play("local-player"); */
-  $("#local-player-name").text(`localVideo(${options.uid})`); 
+  $("#local-player-name").text(`localVideo(${options.uname})`); 
   $("#joined-setup").css("display", "flex");
-
-  // Publish the local video and audio tracks to the channel.
-  await client.publish(Object.values(localTracks));
-  console.log("publish success");
 }
 
 /*
  * Stop all local and remote tracks then leave the channel.
  */
 async function leave() {
-  for (trackName in localTracks) {
+  /* for (trackName in localTracks) {
     var track = localTracks[trackName];
     if (track) {
       track.stop();
       track.close();
       localTracks[trackName] = undefined;
     }
-  }
+  } */
 
   // Remove remote users and player views.
   remoteUsers = {};
@@ -331,11 +366,9 @@ function updateMedia(uid, track, isLocal) {
   
   let playerContainer = getPlayerContainer(uid, isLocal);
   if (!playerContainer) {
-    console.log("playercontainer:", playerContainer)
     createPlayerWrapper(uid);
     playerContainer = getPlayerContainer(uid);
   }
-  console.log("playerContainer.", playerContainer, tagName, isLocal)
 
   const mediaEles = playerContainer.getElementsByTagName(tagName)
   const ele = mediaEles[0];
@@ -344,7 +377,7 @@ function updateMedia(uid, track, isLocal) {
 
 function removeVideoTrack(uid, videoTrack) {
   let playerContainer = getPlayerContainer(uid);
-  if (!playerContaienr) {
+  if (!playerContainer) {
     createPlayerWrapper(uid);
     playerContainer = getPlayerContainer(uid);
   }

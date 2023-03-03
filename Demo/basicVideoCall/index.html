@@ -44,7 +44,7 @@
   user information.
 -->
   <div id="success-alert" class="alert alert-success alert-dismissible fade show" role="alert">
-    <strong>Congratulations!</strong><span> You can invite others join this channel by click </span><a href=""
+    <strong>Congratulations!</strong><span> You can invite others join this room by clicking </span><a href=""
       target="_blank">here</a>
     <button type="button" class="close" data-dismiss="alert" aria-label="Close">
       <span aria-hidden="true">&times;</span>
@@ -80,8 +80,8 @@
     <form id="join-form">
       <div class="row join-info-group">
         <div class="col-sm sso-hidden">
-          <p class="join-info-text">APP ID</p>
-          <input id="appid" type="text" placeholder="Enter the appid">
+          <p class="join-info-text">Room URL</p>
+          <input id="roomurl" type="text" placeholder="Enter the room URL">
           <p class="tips">You find your APP ID in the <a href="https://console.agora.io/projects">Agora Console</a></p>
         </div>
         <div class="col-sm sso-hidden">
@@ -91,15 +91,8 @@
             in Agora Console.</p>
         </div>
         <div class="col-sm">
-          <p class="join-info-text">Channel Name</p>
-          <input id="channel" type="text" placeholder="Enter the channel name" required>
-          <p class="tips">You create a channel when you create a temporary token. You guessed it, in <a
-              href="https://console.agora.io/projects">Agora Console</a></p>
-        </div>
-        <div class="col-sm">
-          <p class="join-info-text">User ID(optional)</p>
-          <input id="uid" type="text" onkeyup="this.value=this.value.replace(/[^0-9]/g,'')"
-            onafterpaste="this.value=this.value.replace(/[^0-9]/g,'')" placeholder="Enter the user ID">
+          <p class="join-info-text">User Name(optional)</p>
+          <input id="uname" type="text" placeholder="Enter the user name">
         </div>
       </div>
 
