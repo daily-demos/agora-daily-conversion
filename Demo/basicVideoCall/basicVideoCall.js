@@ -217,7 +217,10 @@ $(() => {
     // Set up handers for relevant Daily events
     // https://docs.daily.co/reference/daily-js/events
     client
-      .on("joined-meeting", () => {
+      .on("joined-meeting", (ev) => {
+        const p = ev.participants.local;
+        $("#local-player-name").text(`localVideo(${p.user_name} - ${p.session_id})`); 
+
         // As soon as the user joins, set bandwidth
         // to their chosen video profile.
         client.setBandwidth(curVideoProfile.value);
@@ -347,7 +350,6 @@ async function join() {
   
   // Join the room.
   client.join(joinOptions);
-  $("#local-player-name").text(`localVideo(${options.uname})`); 
   $("#joined-setup").css("display", "flex");
 }
 
