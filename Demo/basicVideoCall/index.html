@@ -5,21 +5,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>Basic Video Call -- Agora</title>
+  <title>Basic Video Call -- Agora to Daily conversion</title>
   <link rel="stylesheet" href="../assets/bootstrap.min.css">
   <link rel="stylesheet" href="./index.css">
 </head>
 
 <body>
   <!--
-  This page interacts with the Agora Voice Call for Web Next Generation SDK to easily create Video Call
-  functionality in a Web page.
+  This page interacts with the Daily Client SDK for JavaScript to easily create video call functionality in a web page.
 
-  This HTML page imports the next generation Agora Video SDK for Web from
-  https://download.agora.io/sdk/release/AgoraRTC_N.js and local functionality from cloudProxy.js.
+  This HTML page imports the latest version of `daily-js`.
 
-  The form in this page passes data and actions input by the user to cloudProxy.js. basicVideoCall
-  creates an AgoraRTC client which adds and and removes local and remote users to a specific channel.
+  basicVideoCall creates an Daily call object insstance, through which Daily rooms are joined and relevant call events are handles.
 -->
 
   <!--
@@ -28,7 +25,7 @@
   <div class="container-fluid banner">
     <p class="banner-text">Basic Video Call</p>
     <a style="color: rgb(255, 255, 255);fill: rgb(255, 255, 255);fill-rule: evenodd; position: absolute; right: 10px; top: 4px;"
-      class="Header-link " href="https://github.com/AgoraIO/API-Examples-Web/tree/main/Demo">
+      class="Header-link " href="https://github.com/daily-demos/agora-daily-conversion">
       <svg class="octicon octicon-mark-github v-align-middle" height="32" viewBox="0 0 16 16" version="1.1" width="32"
         aria-hidden="true">
         <path fill-rule="evenodd"
@@ -82,13 +79,12 @@
         <div class="col-sm sso-hidden">
           <p class="join-info-text">Room URL</p>
           <input id="roomurl" type="text" required="true" placeholder="Enter the room URL">
-          <p class="tips">You find your APP ID in the <a href="https://console.agora.io/projects">Agora Console</a></p>
+          <p class="tips">You find your room URL in the <a href="https://dashboard.daily.co">Daily developer dashboard</a></p>
         </div>
         <div class="col-sm sso-hidden">
           <p class="join-info-text">Token(optional)</p>
           <input id="token" type="text" placeholder="Enter the app token">
-          <p class="tips">To create a temporary token, <a href="https://console.agora.io/projects">edit your project</a>
-            in Agora Console.</p>
+          <p class="tips">To create a temporary token, <a href="https://docs.daily.co/reference/rest-api/meeting-tokens/create-meeting-token">use Daily's REST API</a></p>
         </div>
         <div class="col-sm">
           <p class="join-info-text">User Name(optional)</p>
@@ -183,10 +179,6 @@
       </div>
     </div>
   </div>
-
-  <!--
-  Import the Agora Video Call SDK for Web and local calls to it.
--->
   
   <script src="../assets/jquery-3.4.1.min.js"></script>
   <script src="../assets/bootstrap.bundle.min.js"></script>'
