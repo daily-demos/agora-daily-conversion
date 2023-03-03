@@ -431,6 +431,11 @@ function getPlayerContainerID(uid) {
 function updateMedia(uid, track, isLocal) {
   const tagName = track.kind;
   if (tagName !== "video") {
+    // If this is a local user, early out if this
+    // isn't a video track (we don't want to play 
+    // local audio). If this is a remote user and
+    // this is not a video OR audio track, early out
+    // as any other track type is unsupported in this demo.
     if (isLocal || tagName !== "audio") {
       return;
     }
