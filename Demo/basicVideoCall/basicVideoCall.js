@@ -111,7 +111,6 @@ var curVideoProfile;
 let mics = []
 let cams = []
 
-
 // initDevices() starts the user's camera and microphone and
 // populates the device selection list.
 async function initDevices() {
