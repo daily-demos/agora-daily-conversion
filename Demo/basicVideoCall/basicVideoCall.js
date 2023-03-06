@@ -3,16 +3,18 @@
  *  users to join and leave a video call room managed by Daily.
  */
 
+// Client will be an instance of Daily's call object
+// https://docs.daily.co/reference/daily-js/factory-methods/create-call-object
 var client;
 
-/*
- * On initiation. `client` is not attached to any project or channel for any specific user.
- */
 var options = {
   roomurl: null,
   uname: null,
   token: null
 };
+
+let mics = []
+let cams = []
 
 // You can find information about setting track constraints with Daily here:
 // https://docs.daily.co/reference/daily-js/instance-methods/set-bandwidth#main
@@ -108,11 +110,10 @@ var videoProfiles = [{
 
 var curVideoProfile;
 
-let mics = []
-let cams = []
-
-// initDevices() starts the user's camera and microphone and
-// populates the device selection list.
+/**
+ * Start the user's camera and microphone and populate
+ * the device selection list.
+ */
 async function initDevices() {
   const meetingState = client.meetingState();
   if (meetingState !== "joined-meeting" && meetingState !== "joining-meeting") {
@@ -133,8 +134,10 @@ async function initDevices() {
   });
 }
 
-// updateDeviceSelection() updates the list of available
-// cameras and microphones.
+/**
+ * Update the list of available cameras and micrphones.
+ * @param {Object} devices - All available devices
+ */
 function updateDeviceSelection(devices) {
   const d = devices.devices;
 
@@ -166,8 +169,10 @@ function updateDeviceSelection(devices) {
   });
 }
 
-// switchCamera() instructs Daily to use the chosen
-// camera device.
+/**
+ * Instruct Daily to use the given camera device.
+ * @param {string} label - The label of the chosen camera device
+ */
 async function switchCamera(label) {
   currentCam = cams.find(cam => cam.label === label);
   $(".cam-input").val(currentCam.label);
@@ -177,8 +182,10 @@ async function switchCamera(label) {
   });
 }
 
-// switchMicrophone() instructs Daily to use the chosen
-// microphone device.
+/**
+ * Instruct Daily to use the given microphone device.
+ * @param {string} label - The label of the chosen microphone device
+ */
 async function switchMicrophone(label) {
   currentMic = mics.find(mic => mic.label === label);
   $(".mic-input").val(currentMic.label);
@@ -324,8 +331,8 @@ $(".mic-list").delegate("a", "click", function (e) {
   switchMicrophone(this.text);
 });
 
-/*
- * Join a Daily room
+/**
+ * Join a Daily room.
  */
 async function join() {
   const hook = getModifySdpHook(getCodec());
@@ -353,8 +360,8 @@ async function join() {
   $("#joined-setup").css("display", "flex");
 }
 
-/*
- * Leave the Daily room
+/**
+ * Leave the Daily room.
  */
 async function leave() {
   // Remove remote users and player views.
@@ -373,10 +380,10 @@ async function leave() {
   console.log("client leaves channel success");
 }
 
-/*
- * Subscribe to a remote user's video and audio tracks
- *
- * @param {uid - The {@link https://docs.daily.co/reference/daily-js/instance-methods/participants#participant-properties | session ID} of the user being subscribed to.
+/**
+ * Subscribe to a remote user's video and audio tracks.
+ * @param {string} uid - The {@link https://docs.daily.co/reference/daily-js/instance-methods/participants#participant-properties | session ID} 
+ * of the participant being subscribed to
  */
 async function subscribe(uid) {
   // Set up user's media player
@@ -388,8 +395,11 @@ async function subscribe(uid) {
   });
 }
 
-// createPlayerWrapper() creates the DOM elements needed
-// to play the user's media tracks.
+/**
+ * Create the DOM elements needed to play a user's media tracks.
+ * @param {string} uid - The {@link https://docs.daily.co/reference/daily-js/instance-methods/participants#participant-properties | session ID}
+ * of the participant the wrapper is being created for.
+ */
 function createPlayerWrapper(uid) {
   if (!uid) console.trace();
   const player = $(`
@@ -404,8 +414,13 @@ function createPlayerWrapper(uid) {
     $("#remote-playerlist").append(player);
 }
 
-// getPlayerContainer() retrieves the element which contains
-// the user's video and audio elements.
+/**
+ * Retrieve the element which contains the user's
+ * video and audio elements.
+ * @param {string} uid - The {@link https://docs.daily.co/reference/daily-js/instance-methods/participants#participant-properties | session ID}
+ * of the participant whose container is being retrieved
+ * @param {boolean} isLocal - Whether this is the local participant
+*/
 function getPlayerContainer(uid, isLocal) {
   let id = "local-player"
   if (!isLocal) {
@@ -414,8 +429,13 @@ function getPlayerContainer(uid, isLocal) {
   return document.getElementById(id)
 }
 
-// getMediaEle() retrieves the specified media element from
-// the given container.
+/**
+ * Retrieve the specified media element
+ * from the given container.
+ * @param {HTMLElement} container - The DOM element that should contain the
+ * requested media element
+ * @param {string} tagName - The HTML media tag name to retrieve
+*/
 function getMediaEle(container, tagName) {
   const allEles = container.getElementsByTagName(tagName);
   if (allEles.length === 0) return;
@@ -426,8 +446,14 @@ function getPlayerContainerID(uid) {
   return `player-${uid}`;
 }
 
-// updateMedia() updates the given user's media players
-// with the provided track.
+/**
+ * Update the given user's media players with the provided track.
+ * @param {string} uid - The {@link https://docs.daily.co/reference/daily-js/instance-methods/participants#participant-properties | session ID}
+ * of the participant whose media is being updated
+ * @param {MediaStreamTrack} track - The new track to update
+ * the participant's media elements with
+ * @param {boolean} isLocal - Whether this is the local participant
+*/
 function updateMedia(uid, track, isLocal) {
   const tagName = track.kind;
   if (tagName !== "video") {
@@ -451,8 +477,13 @@ function updateMedia(uid, track, isLocal) {
   updateTracksIfNeeded(ele, track)
 }
 
-// removeVideoTrack() removes the given video track
-// from the provided user's video or audio players.
+/**
+ * Remove the given media track from the provided user's
+ * video media element.
+ * @param {string} uid - The {@link https://docs.daily.co/reference/daily-js/instance-methods/participants#participant-properties | session ID}
+ * of the participant whose video track is being removed.
+ * @param {MediaStreamTrack} videoTrack - The video track to remove.
+*/
 function removeVideoTrack(uid, videoTrack) {
   let playerContainer = getPlayerContainer(uid);
   if (!playerContainer) {
@@ -465,10 +496,15 @@ function removeVideoTrack(uid, videoTrack) {
   src.removeTrack(videoTrack);
 }
 
-// updateTracksIfNeeded() checks whether the provided
-// media element already contains the given track. If not,
-// it adds the track to the media element. If an old track
-// already exists on the media element, it is removed.
+/**
+ * Check whether the provided media element already contains
+ * the given track. If not, add the track to the media element.
+ * If an old track already exists on the media element, remove it.
+ * @param {HTMLMediaElement} mediaEle - The media element which should contain
+ * the given media track
+ * @param {MediaStreamTrack} newTrack - The media track which the media element
+ * should contain
+*/
 function updateTracksIfNeeded(mediaEle, newTrack) {
   let src = mediaEle.srcObject;
   if (!src) {
@@ -492,8 +528,9 @@ function updateTracksIfNeeded(mediaEle, newTrack) {
   }
 }
 
-// getCodec() retrieves which codec the user chose from the
-// Advanced Settings dropdown.
+/**
+ * Retrieve which codec the user chose from the Advanced Settings dropdown.
+*/
 function getCodec() {
   var radios = document.getElementsByName("radios");
   var value;
@@ -508,6 +545,10 @@ function getCodec() {
 
 // getModifySdpHook() takes a desired codec and returns 
 // the given hook to pass to Daily to prefer that codec.
+/**
+ * Return a hook which instructs Daily to prefer the specified codec
+ * @param {VP8 | VP9 | H264} wantedCodec - Which codec Daily should prefer
+*/
 function getModifySdpHook(wantedCodec) {
   if (wantedCodec === '') {
     return null;
