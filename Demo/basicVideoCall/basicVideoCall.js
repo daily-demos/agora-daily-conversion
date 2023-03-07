@@ -244,7 +244,6 @@ $(() => {
         }
       })
       .on("track-started", (ev) => {
-        const meetingState = client.meetingState();
         const p = ev.participant;
         const track = ev.track;
         const kind = track.kind;
@@ -258,7 +257,9 @@ $(() => {
           $(".cam-input").val(label);
         }
 
-        // Only show media if already in the call
+        // Only show media if already in the call, or in 
+        // the process of joining the call.
+        const meetingState = client.meetingState();
         if (meetingState === "joined-meeting" || meetingState === "joining-meeting") {
           updateMedia(p.session_id, track, p.local);
         }
@@ -507,22 +508,33 @@ function removeVideoTrack(uid, videoTrack) {
  * should contain
 */
 function updateTracksIfNeeded(mediaEle, newTrack) {
-  let src = mediaEle.srcObject;
+  // Get existing source object from media element
+  const src = mediaEle.srcObject;
+  // If source object does not already exist, create a new one
+  // and early out. Update complete!
   if (!src) {
     mediaEle.srcObject = new MediaStream([newTrack]);
-    src = mediaEle.srcObject;
     return;
   }
+
+  // Get all existing tracks from the existing source object
   const allTracks = src.getTracks();
   const l = allTracks.length;
   if (l === 0) {
+    // If the existig source object has no tracks, just add
+    // the new track and early  out.
     src.addTrack(newTrack);
     return;
   }
   if (l > 1) {
     console.warn(`Expected 1 track, got ${l}. Only working with the first.`)
   }
+  // Retrieve the first track
   const existingTrack = allTracks[0];
+  // If the existing track ID does not match the new track ID,
+  // remove the existing track from the source object and add
+  // the new track. If IDs match, it must be the same track, so
+  // no need to do anything.
   if (existingTrack.id !== newTrack.id) {
     src.removeTrack(existingTrack);
     src.addTrack(newTrack);
