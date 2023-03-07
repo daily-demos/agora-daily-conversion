@@ -232,12 +232,6 @@ $(() => {
         // to their chosen video profile.
         client.setBandwidth(curVideoProfile.value);
       })
-      .on("participant-joined", (ev) => {
-        subscribe(ev.participant.session_id);
-      })
-      .on("participant-left", (ev) => {
-        $(`#player-wrapper-${ev.participant.session_id}`).remove();
-      })
       .on("track-stopped", (ev) => {
         const p = ev.participant;
 
@@ -335,6 +329,13 @@ $(".mic-list").delegate("a", "click", function (e) {
  * Join a Daily room.
  */
 async function join() {
+  client.on("participant-joined", (ev) => {
+    subscribe(ev.participant.session_id);
+  });
+  client.on("participant-left", (ev) => {
+    $(`#player-wrapper-${ev.participant.session_id}`).remove();
+  });
+
   const hook = getModifySdpHook(getCodec());
   const joinOptions = {
     url: options.roomurl,
