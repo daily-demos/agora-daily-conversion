@@ -228,6 +228,23 @@ $(() => {
         const p = ev.participants.local;
         $("#local-player-name").text(`localVideo(${p.user_name} - ${p.session_id})`); 
 
+        // Set SFU network topology, to more closely resemble
+        // Agora's behavior.
+        client.getNetworkTopology().then((res => {
+          if (res.topology !== "sfu") {
+            // In a production app where you create rooms
+            // via the REST API, I suggest using our
+            // `sfu_switchover` room property instead.
+            client.setNetworkTopology({topology: "sfu"});
+          }
+        }));
+
+        // Update local user's video track if it already exists
+        const videoTrack = p.tracks?.video?.persistentTrack;
+        if (videoTrack) {
+          updateMedia(p.session_id, videoTrack, true);
+        }
+
         // As soon as the user joins, set bandwidth
         // to their chosen video profile.
         client.setBandwidth(curVideoProfile.value);
@@ -337,14 +354,18 @@ async function join() {
     $(`#player-wrapper-${ev.participant.session_id}`).remove();
   });
 
-  const hook = getModifySdpHook(getCodec());
   const joinOptions = {
     url: options.roomurl,
     startAudioOff: false,
     startVideoOff: false,
     userName: "No name",
-    dailyConfig: {
-      modifyLocalSdpHook: hook,
+  }
+
+  const wantH264 = getCodec() === "h264";
+  if (wantH264) {
+    joinOptions.dailyConfig = {
+      preferH264ForScreenSharing: true,
+      preferH264ForCam: true,
     }
   }
 
@@ -352,6 +373,7 @@ async function join() {
   if (userName) {
     joinOptions.userName = userName;
   }
+
   const token = options.token;
   if (token) {
     joinOptions.token = token;
@@ -553,49 +575,4 @@ function getCodec() {
     }
   }
   return value;
-}
-
-
-// getModifySdpHook() takes a desired codec and returns 
-// the given hook to pass to Daily to prefer that codec.
-/**
- * Return a hook which instructs Daily to prefer the specified codec
- * @param {VP8 | VP9 | H264} wantedCodec - Which codec Daily should prefer
-*/
-function getModifySdpHook(wantedCodec) {
-  if (wantedCodec === '') {
-    return null;
-  }
-  const valid = ['VP8', 'VP9', 'H264'];
-  const codecName = wantedCodec.toUpperCase();
-  if (!valid.includes(codecName)) {
-    throw new Error(
-      `invalid codec name supplied: ${wantedCodec}; valid options are: ${valid.join(
-        ' '
-      )}`
-    );
-  }
-  const hook = (rtcSDP) => {
-    try {
-      const camIdx = 0;
-      const parsed = sdpTransform.parse(rtcSDP.sdp);
-      const camMedia = parsed.media[camIdx];
-      const preferredCodec = camMedia.rtp.filter(
-        (r) => r.codec === codecName
-      );
-      const notPreferredCodec = camMedia.rtp.filter(
-        (r) => r.codec !== codecName
-      );
-      const newPayloads = [...preferredCodec, ...notPreferredCodec]
-        .map((r) => r.payload)
-        .join(' ');
-      parsed.media[camIdx].payloads = newPayloads;
-      const newSdp = sdpTransform.write(parsed);
-      return newSdp;
-    } catch (e) {
-      console.error(`failed to set codec preference: ${e}`);
-    }
-    return rtcSDP;
-  };
-  return hook;
 }
