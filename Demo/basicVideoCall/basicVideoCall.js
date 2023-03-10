@@ -359,14 +359,16 @@ async function join() {
     startAudioOff: false,
     startVideoOff: false,
     userName: "No name",
+    dailyConfig: {
+      camSimulcastEncodings: [{ maxBitrate: 3000000, maxFramerate: 30 }],
+    }
   }
 
   const wantH264 = getCodec() === "h264";
   if (wantH264) {
-    joinOptions.dailyConfig = {
-      preferH264ForScreenSharing: true,
-      preferH264ForCam: true,
-    }
+    const dc = joinOptions.dailyConfig;
+    dc.preferH264ForScreenSharing = true;
+    dc.preferH264ForCam = true;
   }
 
   const userName = options.uname;
