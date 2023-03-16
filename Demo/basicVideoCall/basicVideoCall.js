@@ -366,9 +366,7 @@ async function join() {
 
   const wantH264 = getCodec() === "h264";
   if (wantH264) {
-    const dc = joinOptions.dailyConfig;
-    dc.preferH264ForScreenSharing = true;
-    dc.preferH264ForCam = true;
+    joinOptions.dailyConfig.preferH264ForCam = true;
   }
 
   const userName = options.uname;
