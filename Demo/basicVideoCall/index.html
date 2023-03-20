@@ -5,21 +5,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>Basic Video Call -- Agora</title>
+  <title>Basic Video Call -- Agora to Daily conversion</title>
   <link rel="stylesheet" href="../assets/bootstrap.min.css">
   <link rel="stylesheet" href="./index.css">
 </head>
 
 <body>
   <!--
-  This page interacts with the Agora Voice Call for Web Next Generation SDK to easily create Video Call
-  functionality in a Web page.
+  This page interacts with the Daily Client SDK for JavaScript to easily create video call functionality in a web page.
 
-  This HTML page imports the next generation Agora Video SDK for Web from
-  https://download.agora.io/sdk/release/AgoraRTC_N.js and local functionality from cloudProxy.js.
+  This HTML page imports the latest version of `daily-js`.
 
-  The form in this page passes data and actions input by the user to cloudProxy.js. basicVideoCall
-  creates an AgoraRTC client which adds and and removes local and remote users to a specific channel.
+  basicVideoCall creates an Daily call object insstance, through which Daily rooms are joined and relevant call events are handled.
 -->
 
   <!--
@@ -28,7 +25,7 @@
   <div class="container-fluid banner">
     <p class="banner-text">Basic Video Call</p>
     <a style="color: rgb(255, 255, 255);fill: rgb(255, 255, 255);fill-rule: evenodd; position: absolute; right: 10px; top: 4px;"
-      class="Header-link " href="https://github.com/AgoraIO/API-Examples-Web/tree/main/Demo">
+      class="Header-link " href="https://github.com/daily-demos/agora-daily-conversion">
       <svg class="octicon octicon-mark-github v-align-middle" height="32" viewBox="0 0 16 16" version="1.1" width="32"
         aria-hidden="true">
         <path fill-rule="evenodd"
@@ -44,7 +41,7 @@
   user information.
 -->
   <div id="success-alert" class="alert alert-success alert-dismissible fade show" role="alert">
-    <strong>Congratulations!</strong><span> You can invite others join this channel by click </span><a href=""
+    <strong>Congratulations!</strong><span> You can invite others to join this room by clicking </span><a href=""
       target="_blank">here</a>
     <button type="button" class="close" data-dismiss="alert" aria-label="Close">
       <span aria-hidden="true">&times;</span>
@@ -80,26 +77,18 @@
     <form id="join-form">
       <div class="row join-info-group">
         <div class="col-sm sso-hidden">
-          <p class="join-info-text">APP ID</p>
-          <input id="appid" type="text" placeholder="Enter the appid">
-          <p class="tips">You find your APP ID in the <a href="https://console.agora.io/projects">Agora Console</a></p>
+          <p class="join-info-text">Room URL</p>
+          <input id="roomurl" type="text" required="true" placeholder="Enter the room URL">
+          <p class="tips">You find your room URL or create a new room in Daily's <a href="https://dashboard.daily.co/rooms">developer dashboard</a></p>
         </div>
         <div class="col-sm sso-hidden">
           <p class="join-info-text">Token(optional)</p>
-          <input id="token" type="text" placeholder="Enter the app token">
-          <p class="tips">To create a temporary token, <a href="https://console.agora.io/projects">edit your project</a>
-            in Agora Console.</p>
+          <input id="token" type="text" placeholder="Enter the meeting token">
+          <p class="tips">To create a temporary token, <a href="https://docs.daily.co/reference/rest-api/meeting-tokens/create-meeting-token">use Daily's REST API</a></p>
         </div>
         <div class="col-sm">
-          <p class="join-info-text">Channel Name</p>
-          <input id="channel" type="text" placeholder="Enter the channel name" required>
-          <p class="tips">You create a channel when you create a temporary token. You guessed it, in <a
-              href="https://console.agora.io/projects">Agora Console</a></p>
-        </div>
-        <div class="col-sm">
-          <p class="join-info-text">User ID(optional)</p>
-          <input id="uid" type="text" onkeyup="this.value=this.value.replace(/[^0-9]/g,'')"
-            onafterpaste="this.value=this.value.replace(/[^0-9]/g,'')" placeholder="Enter the user ID">
+          <p class="join-info-text">User Name(optional)</p>
+          <input id="uname" type="text" placeholder="Enter the user name">
         </div>
       </div>
 
@@ -180,7 +169,9 @@
     <div class="row video-group">
       <div class="col">
         <p id="local-player-name" class="player-name"></p>
-        <div id="local-player" class="player"></div>
+        <div id="local-player" class="player">
+          <video playsinline autoplay></video>
+        </div>
       </div>
       <div class="w-100"></div>
       <div class="col">
@@ -188,14 +179,11 @@
       </div>
     </div>
   </div>
-
-  <!--
-  Import the Agora Video Call SDK for Web and local calls to it.
--->
   
   <script src="../assets/jquery-3.4.1.min.js"></script>
-  <script src="../assets/bootstrap.bundle.min.js"></script>
-  <script src="https://download.agora.io/sdk/release/AgoraRTC_N.js"></script>
+  <script src="../assets/bootstrap.bundle.min.js"></script>'
+  <script src="https://unpkg.com/@daily-co/daily-js"></script>
+  <script src="../sdp-transform/sdp-transform.js"></script>
   <script src="./basicVideoCall.js"></script>
 </body>
 

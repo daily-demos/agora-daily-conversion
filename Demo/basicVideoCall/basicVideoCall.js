@@ -1,140 +1,202 @@
 /*
- *  These procedures use Agora Video Call SDK for Web to enable local and remote
- *  users to join and leave a Video Call channel managed by Agora Platform.
+ *  These procedures use Daily's Client SDK for JavaScript to enable local and remote
+ *  users to join and leave a video call room managed by Daily.
  */
 
-/*
- *  Create an {@link https://docs.agora.io/en/Video/API%20Reference/web_ng/interfaces/iagorartcclient.html|AgoraRTCClient} instance.
- *
- * @param {string} mode - The {@link https://docs.agora.io/en/Voice/API%20Reference/web_ng/interfaces/clientconfig.html#mode| streaming algorithm} used by Agora SDK.
- * @param  {string} codec - The {@link https://docs.agora.io/en/Voice/API%20Reference/web_ng/interfaces/clientconfig.html#codec| client codec} used by the browser.
- */
+// Client will be an instance of Daily's call object
+// https://docs.daily.co/reference/daily-js/factory-methods/create-call-object
 var client;
 
-/*
- * Clear the video and audio tracks used by `client` on initiation.
- */
-var localTracks = {
-  videoTrack: null,
-  audioTrack: null
-};
-
-/*
- * On initiation no users are connected.
- */
-var remoteUsers = {};
-
-/*
- * On initiation. `client` is not attached to any project or channel for any specific user.
- */
 var options = {
-  appid: null,
-  channel: null,
-  uid: null,
+  roomurl: null,
+  uname: null,
   token: null
 };
 
-// you can find all the agora preset video profiles here https://docs.agora.io/en/Voice/API%20Reference/web_ng/globals.html#videoencoderconfigurationpreset
+let mics = []
+let cams = []
+
+// You can find information about setting track constraints with Daily here:
+// https://docs.daily.co/reference/daily-js/instance-methods/set-bandwidth#main
 var videoProfiles = [{
   label: "360p_7",
   detail: "480×360, 15fps, 320Kbps",
-  value: "360p_7"
+  value: { 
+    kbs: 320, 
+    trackConstraints: { 
+      width: 480,
+      height: 360,
+      frameRate: 15,
+    } 
+  }
 }, {
   label: "360p_8",
   detail: "480×360, 30fps, 490Kbps",
-  value: "360p_8"
+  value: { 
+    kbs: 490, 
+    trackConstraints: { 
+      width: 480,
+      height: 360,
+      frameRate: 30,
+    } 
+  }
 }, {
   label: "480p_1",
   detail: "640×480, 15fps, 500Kbps",
-  value: "480p_1"
+  value: { 
+    kbs: 500, 
+    trackConstraints: { 
+      width: 480,
+      height: 370,
+      frameRate: 15,
+    } 
+  }
 }, {
   label: "480p_2",
   detail: "640×480, 30fps, 1000Kbps",
-  value: "480p_2"
+  value: { 
+    kbs: 1000, 
+    trackConstraints: { 
+      width: 640,
+      height: 480,
+      frameRate: 30,
+    } 
+  }
 }, {
   label: "720p_1",
   detail: "1280×720, 15fps, 1130Kbps",
-  value: "720p_1"
+  value: { 
+    kbs: 1130, 
+    trackConstraints: { 
+      width: 1280,
+      height: 720,
+      frameRate: 15,
+    } 
+  }
 }, {
   label: "720p_2",
   detail: "1280×720, 30fps, 2000Kbps",
-  value: "720p_2"
+  value: { 
+    kbs: 2000, 
+    trackConstraints: { 
+      width: 1280,
+      height: 720,
+      frameRate: 30,
+    } 
+  }
 }, {
   label: "1080p_1",
   detail: "1920×1080, 15fps, 2080Kbps",
-  value: "1080p_1"
+  value: { 
+    kbs: 2080, 
+    trackConstraints: { 
+      width: 1920,
+      height: 1080,
+      frameRate: 15,
+    } 
+  }
 }, {
   label: "1080p_2",
   detail: "1920×1080, 30fps, 3000Kbps",
-  value: "1080p_2"
+  value: { 
+    kbs: 3000, 
+    trackConstraints: { 
+      width: 1920,
+      height: 1080,
+      frameRate: 30,
+    } 
+  }
 }];
+
 var curVideoProfile;
-AgoraRTC.onAutoplayFailed = () => {
-  alert("click to start autoplay!");
-};
-AgoraRTC.onMicrophoneChanged = async changedDevice => {
-  // When plugging in a device, switch to a device that is newly plugged in.
-  if (changedDevice.state === "ACTIVE") {
-    localTracks.audioTrack.setDevice(changedDevice.device.deviceId);
-    // Switch to an existing device when the current device is unplugged.
-  } else if (changedDevice.device.label === localTracks.audioTrack.getTrackLabel()) {
-    const oldMicrophones = await AgoraRTC.getMicrophones();
-    oldMicrophones[0] && localTracks.audioTrack.setDevice(oldMicrophones[0].deviceId);
-  }
-};
-AgoraRTC.onCameraChanged = async changedDevice => {
-  // When plugging in a device, switch to a device that is newly plugged in.
-  if (changedDevice.state === "ACTIVE") {
-    localTracks.videoTrack.setDevice(changedDevice.device.deviceId);
-    // Switch to an existing device when the current device is unplugged.
-  } else if (changedDevice.device.label === localTracks.videoTrack.getTrackLabel()) {
-    const oldCameras = await AgoraRTC.getCameras();
-    oldCameras[0] && localTracks.videoTrack.setDevice(oldCameras[0].deviceId);
-  }
-};
+
+/**
+ * Start the user's camera and microphone and populate
+ * the device selection list.
+ */
 async function initDevices() {
-  if (!localTracks.audioTrack) {
-    localTracks.audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
-      encoderConfig: "music_standard"
-    });
+  const meetingState = client.meetingState();
+  if (meetingState !== "joined-meeting" && meetingState !== "joining-meeting") {
+    client.preAuth();
+    client.startCamera();
   }
-  if (!localTracks.videoTrack) {
-    localTracks.videoTrack = await AgoraRTC.createCameraVideoTrack({
-      encoderConfig: curVideoProfile.value
-    });
+  
+  client.enumerateDevices().then(devices => {
+    updateDeviceSelection(devices);
+  })
+
+  // Set up device change listener, for handling newly plugged in
+  // or removed devices.
+  navigator.mediaDevices.addEventListener('devicechange', () => {
+    client.enumerateDevices().then(devices => {
+      updateDeviceSelection(devices);
+    })
+  });
+}
+
+/**
+ * Update the list of available cameras and micrphones.
+ * @param {Object} devices - All available devices
+ */
+function updateDeviceSelection(devices) {
+  const d = devices.devices;
+
+  // Reset device list
+  mics = [];
+  cams = [];
+
+  // Iterate through all devices
+  for (let i = 0; i < d.length; i += 1){
+    const device = d[i];
+    const kind = device.kind;
+    if (kind === "audioinput") {
+      mics.push(device);
+    } else if (kind === "videoinput") {
+      cams.push(device);
+    }
   }
-  // get mics
-  mics = await AgoraRTC.getMicrophones();
-  const audioTrackLabel = localTracks.audioTrack.getTrackLabel();
-  currentMic = mics.find(item => item.label === audioTrackLabel);
-  $(".mic-input").val(currentMic.label);
+
+  // Populate mic list
   $(".mic-list").empty();
   mics.forEach(mic => {
     $(".mic-list").append(`<a class="dropdown-item" href="#">${mic.label}</a>`);
   });
 
-  // get cameras
-  cams = await AgoraRTC.getCameras();
-  const videoTrackLabel = localTracks.videoTrack.getTrackLabel();
-  currentCam = cams.find(item => item.label === videoTrackLabel);
-  $(".cam-input").val(currentCam.label);
+  // Populate cam list
   $(".cam-list").empty();
   cams.forEach(cam => {
     $(".cam-list").append(`<a class="dropdown-item" href="#">${cam.label}</a>`);
   });
 }
+
+/**
+ * Instruct Daily to use the given camera device.
+ * @param {string} label - The label of the chosen camera device
+ */
 async function switchCamera(label) {
   currentCam = cams.find(cam => cam.label === label);
   $(".cam-input").val(currentCam.label);
   // switch device of local video track.
-  await localTracks.videoTrack.setDevice(currentCam.deviceId);
+  client.setInputDevicesAsync({
+    videoSource: currentCam.deviceId,  
+  });
 }
+
+/**
+ * Instruct Daily to use the given microphone device.
+ * @param {string} label - The label of the chosen microphone device
+ */
 async function switchMicrophone(label) {
   currentMic = mics.find(mic => mic.label === label);
   $(".mic-input").val(currentMic.label);
   // switch device of local audio track.
-  await localTracks.audioTrack.setDevice(currentMic.deviceId);
+  client.setInputDevicesAsync({
+    audioSource: currentMic.deviceId,  
+  });
 }
+
+// initVideoProfiles populates the UI showing 
+// user media constraint setting presets.
 function initVideoProfiles() {
   videoProfiles.forEach(profile => {
     $(".profile-list").append(`<a class="dropdown-item" label="${profile.label}" href="#">${profile.label}: ${profile.detail}</a>`);
@@ -146,28 +208,94 @@ async function changeVideoProfile(label) {
   curVideoProfile = videoProfiles.find(profile => profile.label === label);
   $(".profile-input").val(`${curVideoProfile.detail}`);
   // change the local video track`s encoder configuration
-  localTracks.videoTrack && (await localTracks.videoTrack.setEncoderConfiguration(curVideoProfile.value));
+  client.setBandwidth(curVideoProfile.value);
 }
 
 /*
  * When this page is called with parameters in the URL, this procedure
- * attempts to join a Video Call channel using those parameters.
+ * attempts to join a video call room using those parameters.
  */
 $(() => {
+  if (!client) {
+    client = DailyIframe.createCallObject({
+      subscribeToTracksAutomatically: false,
+    });
+
+    // Set up handers for relevant Daily events
+    // https://docs.daily.co/reference/daily-js/events
+    client
+      .on("joined-meeting", (ev) => {
+        const p = ev.participants.local;
+        $("#local-player-name").text(`localVideo(${p.user_name} - ${p.session_id})`); 
+
+        // Set SFU network topology, to more closely resemble
+        // Agora's behavior.
+        client.getNetworkTopology().then((res => {
+          if (res.topology !== "sfu") {
+            // In a production app where you create rooms
+            // via the REST API, I suggest using our
+            // `sfu_switchover` room property instead.
+            client.setNetworkTopology({topology: "sfu"});
+          }
+        }));
+
+        // Update local user's video track if it already exists
+        const videoTrack = p.tracks?.video?.persistentTrack;
+        if (videoTrack) {
+          updateMedia(p.session_id, videoTrack, true);
+        }
+
+        // As soon as the user joins, set bandwidth
+        // to their chosen video profile.
+        client.setBandwidth(curVideoProfile.value);
+      })
+      .on("track-stopped", (ev) => {
+        const p = ev.participant;
+
+        // If there's no participant, they must have left.
+        // This will be handled via the "participant-left" event.
+        if (!p) return;
+        const track = ev.track;
+        if (track.kind === "video") {
+          removeVideoTrack(p.session_id, track, p.local);
+        }
+      })
+      .on("track-started", (ev) => {
+        const p = ev.participant;
+        const track = ev.track;
+        const kind = track.kind;
+        const label = track.label;
+
+        // Make sure device selection is populated with
+        // currently chosen devices.
+        if (kind === "audio") {
+          $(".mic-input").val(label);
+        } else if (kind === "video") {
+          $(".cam-input").val(label);
+        }
+
+        // Only show media if already in the call, or in 
+        // the process of joining the call.
+        const meetingState = client.meetingState();
+        if (meetingState === "joined-meeting" || meetingState === "joining-meeting") {
+          updateMedia(p.session_id, track, p.local);
+        }
+      });
+  }
+
   initVideoProfiles();
   $(".profile-list").delegate("a", "click", function (e) {
     changeVideoProfile(this.getAttribute("label"));
   });
   var urlParams = new URL(location.href).searchParams;
-  options.appid = urlParams.get("appid");
+  options.roomurl = urlParams.get("roomurl");
   options.channel = urlParams.get("channel");
   options.token = urlParams.get("token");
-  options.uid = urlParams.get("uid");
-  if (options.appid && options.channel) {
-    $("#uid").val(options.uid);
-    $("#appid").val(options.appid);
+  options.uname = urlParams.get("uname");
+  if (options.roomurl) {
+    $("#uname").val(options.uname);
+    $("#roomurl").val(options.roomurl);
     $("#token").val(options.token);
-    $("#channel").val(options.channel);
     $("#join-form").submit();
   }
 });
@@ -181,21 +309,15 @@ $("#join-form").submit(async function (e) {
   e.preventDefault();
   $("#join").attr("disabled", true);
   try {
-    if (!client) {
-      client = AgoraRTC.createClient({
-        mode: "rtc",
-        codec: getCodec()
-      });
-    }
-    options.channel = $("#channel").val();
-    options.uid = Number($("#uid").val());
-    options.appid = $("#appid").val();
+    options.uname = $("#uname").val();
+    options.roomurl = $("#roomurl").val();
     options.token = $("#token").val();
+
     await join();
     if (options.token) {
       $("#success-alert-with-token").css("display", "block");
     } else {
-      $("#success-alert a").attr("href", `index.html?appid=${options.appid}&channel=${options.channel}&token=${options.token}`);
+      $("#success-alert a").attr("href", `index.html?roomurl=${options.roomurl}`);
       $("#success-alert").css("display", "block");
     }
   } catch (error) {
@@ -221,55 +343,60 @@ $(".mic-list").delegate("a", "click", function (e) {
   switchMicrophone(this.text);
 });
 
-/*
- * Join a channel, then create local video and audio tracks and publish them to the channel.
+/**
+ * Join a Daily room.
  */
 async function join() {
-  // Add an event listener to play remote tracks when remote user publishes.
-  client.on("user-published", handleUserPublished);
-  client.on("user-unpublished", handleUserUnpublished);
-  // Join the channel.
-  options.uid = await client.join(options.appid, options.channel, options.token || null, options.uid || null);
-  if (!localTracks.audioTrack) {
-    localTracks.audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
-      encoderConfig: "music_standard"
-    });
-  }
-  if (!localTracks.videoTrack) {
-    localTracks.videoTrack = await AgoraRTC.createCameraVideoTrack({
-      encoderConfig: curVideoProfile.value
-    });
-  }
+  client.on("participant-joined", (ev) => {
+    subscribe(ev.participant.session_id);
+  });
+  client.on("participant-left", (ev) => {
+    $(`#player-wrapper-${ev.participant.session_id}`).remove();
+  });
 
-  // Play the local video track to the local browser and update the UI with the user ID.
-  localTracks.videoTrack.play("local-player");
-  $("#local-player-name").text(`localVideo(${options.uid})`);
-  $("#joined-setup").css("display", "flex");
-
-  // Publish the local video and audio tracks to the channel.
-  await client.publish(Object.values(localTracks));
-  console.log("publish success");
-}
-
-/*
- * Stop all local and remote tracks then leave the channel.
- */
-async function leave() {
-  for (trackName in localTracks) {
-    var track = localTracks[trackName];
-    if (track) {
-      track.stop();
-      track.close();
-      localTracks[trackName] = undefined;
+  const joinOptions = {
+    url: options.roomurl,
+    startAudioOff: false,
+    startVideoOff: false,
+    userName: "No name",
+    dailyConfig: {
+      camSimulcastEncodings: [{ maxBitrate: 3000000, maxFramerate: 30 }],
     }
   }
 
+  const wantH264 = getCodec() === "h264";
+  if (wantH264) {
+    joinOptions.dailyConfig.preferH264ForCam = true;
+  }
+
+  const userName = options.uname;
+  if (userName) {
+    joinOptions.userName = userName;
+  }
+
+  const token = options.token;
+  if (token) {
+    joinOptions.token = token;
+  }
+  
+  // Join the room.
+  client.join(joinOptions);
+  $("#joined-setup").css("display", "flex");
+}
+
+/**
+ * Leave the Daily room.
+ */
+async function leave() {
   // Remove remote users and player views.
-  remoteUsers = {};
   $("#remote-playerlist").html("");
 
   // leave the channel
   await client.leave();
+  const container = getPlayerContainer(-1, true);
+  const mediaEle = getMediaEle(container, "video");
+  mediaEle.srcObject = null;
+
   $("#local-player-name").text("");
   $("#join").attr("disabled", false);
   $("#leave").attr("disabled", true);
@@ -277,56 +404,168 @@ async function leave() {
   console.log("client leaves channel success");
 }
 
-/*
- * Add the local use to a remote channel.
- *
- * @param  {IAgoraRTCRemoteUser} user - The {@link  https://docs.agora.io/en/Voice/API%20Reference/web_ng/interfaces/iagorartcremoteuser.html| remote user} to add.
- * @param {trackMediaType - The {@link https://docs.agora.io/en/Voice/API%20Reference/web_ng/interfaces/itrack.html#trackmediatype | media type} to add.
+/**
+ * Subscribe to a remote user's video and audio tracks.
+ * @param {string} uid - The {@link https://docs.daily.co/reference/daily-js/instance-methods/participants#participant-properties | session ID} 
+ * of the participant being subscribed to
  */
-async function subscribe(user, mediaType) {
-  const uid = user.uid;
-  // subscribe to a remote user
-  await client.subscribe(user, mediaType);
-  console.log("subscribe success");
-  if (mediaType === "video") {
-    const player = $(`
+async function subscribe(uid) {
+  // Set up user's media player
+  createPlayerWrapper(uid);
+
+  // Subscribe to a remote user
+  client.updateParticipant(uid, {
+    setSubscribedTracks: { audio: true, video: true }
+  });
+}
+
+/**
+ * Create the DOM elements needed to play a user's media tracks.
+ * @param {string} uid - The {@link https://docs.daily.co/reference/daily-js/instance-methods/participants#participant-properties | session ID}
+ * of the participant the wrapper is being created for.
+ */
+function createPlayerWrapper(uid) {
+  if (!uid) console.trace();
+  const player = $(`
       <div id="player-wrapper-${uid}">
         <p class="player-name">remoteUser(${uid})</p>
-        <div id="player-${uid}" class="player"></div>
+        <div id="${getPlayerContainerID(uid)}" class="player">
+          <video playsinline="true" autoplay="true"></video>
+          <audio autoplay="true"></audio>
+        </div>
       </div>
     `);
     $("#remote-playerlist").append(player);
-    user.videoTrack.play(`player-${uid}`);
+}
+
+/**
+ * Retrieve the element which contains the user's
+ * video and audio elements.
+ * @param {string} uid - The {@link https://docs.daily.co/reference/daily-js/instance-methods/participants#participant-properties | session ID}
+ * of the participant whose container is being retrieved
+ * @param {boolean} isLocal - Whether this is the local participant
+*/
+function getPlayerContainer(uid, isLocal) {
+  let id = "local-player"
+  if (!isLocal) {
+    id = getPlayerContainerID(uid)
   }
-  if (mediaType === "audio") {
-    user.audioTrack.play();
+  return document.getElementById(id)
+}
+
+/**
+ * Retrieve the specified media element
+ * from the given container.
+ * @param {HTMLElement} container - The DOM element that should contain the
+ * requested media element
+ * @param {string} tagName - The HTML media tag name to retrieve
+*/
+function getMediaEle(container, tagName) {
+  const allEles = container.getElementsByTagName(tagName);
+  if (allEles.length === 0) return;
+  return allEles[0];
+}
+ 
+function getPlayerContainerID(uid) {
+  return `player-${uid}`;
+}
+
+/**
+ * Update the given user's media players with the provided track.
+ * @param {string} uid - The {@link https://docs.daily.co/reference/daily-js/instance-methods/participants#participant-properties | session ID}
+ * of the participant whose media is being updated
+ * @param {MediaStreamTrack} track - The new track to update
+ * the participant's media elements with
+ * @param {boolean} isLocal - Whether this is the local participant
+*/
+function updateMedia(uid, track, isLocal) {
+  const tagName = track.kind;
+  if (tagName !== "video") {
+    // If this is a local user, early out if this
+    // isn't a video track (we don't want to play 
+    // local audio). If this is a remote user and
+    // this is not a video OR audio track, early out
+    // as any other track type is unsupported in this demo.
+    if (isLocal || tagName !== "audio") {
+      return;
+    }
+  }
+  
+  let playerContainer = getPlayerContainer(uid, isLocal);
+  if (!playerContainer) {
+    createPlayerWrapper(uid);
+    playerContainer = getPlayerContainer(uid);
+  }
+
+  const ele = getMediaEle(playerContainer, tagName);
+  updateTracksIfNeeded(ele, track)
+}
+
+/**
+ * Remove the given media track from the provided user's
+ * video media element.
+ * @param {string} uid - The {@link https://docs.daily.co/reference/daily-js/instance-methods/participants#participant-properties | session ID}
+ * of the participant whose video track is being removed.
+ * @param {MediaStreamTrack} videoTrack - The video track to remove.
+*/
+function removeVideoTrack(uid, videoTrack) {
+  let playerContainer = getPlayerContainer(uid);
+  if (!playerContainer) {
+    createPlayerWrapper(uid);
+    playerContainer = getPlayerContainer(uid);
+  }
+  const videoEle = getMediaEle(playerContainer, "video");
+  const src = videoEle.srcObject;
+  if (!src) return;
+  src.removeTrack(videoTrack);
+}
+
+/**
+ * Check whether the provided media element already contains
+ * the given track. If not, add the track to the media element.
+ * If an old track already exists on the media element, remove it.
+ * @param {HTMLMediaElement} mediaEle - The media element which should contain
+ * the given media track
+ * @param {MediaStreamTrack} newTrack - The media track which the media element
+ * should contain
+*/
+function updateTracksIfNeeded(mediaEle, newTrack) {
+  // Get existing source object from media element
+  const src = mediaEle.srcObject;
+  // If source object does not already exist, create a new one
+  // and early out. Update complete!
+  if (!src) {
+    mediaEle.srcObject = new MediaStream([newTrack]);
+    return;
+  }
+
+  // Get all existing tracks from the existing source object
+  const allTracks = src.getTracks();
+  const l = allTracks.length;
+  if (l === 0) {
+    // If the existig source object has no tracks, just add
+    // the new track and early  out.
+    src.addTrack(newTrack);
+    return;
+  }
+  if (l > 1) {
+    console.warn(`Expected 1 track, got ${l}. Only working with the first.`)
+  }
+  // Retrieve the first track
+  const existingTrack = allTracks[0];
+  // If the existing track ID does not match the new track ID,
+  // remove the existing track from the source object and add
+  // the new track. If IDs match, it must be the same track, so
+  // no need to do anything.
+  if (existingTrack.id !== newTrack.id) {
+    src.removeTrack(existingTrack);
+    src.addTrack(newTrack);
   }
 }
 
-/*
- * Add a user who has subscribed to the live channel to the local interface.
- *
- * @param  {IAgoraRTCRemoteUser} user - The {@link  https://docs.agora.io/en/Voice/API%20Reference/web_ng/interfaces/iagorartcremoteuser.html| remote user} to add.
- * @param {trackMediaType - The {@link https://docs.agora.io/en/Voice/API%20Reference/web_ng/interfaces/itrack.html#trackmediatype | media type} to add.
- */
-function handleUserPublished(user, mediaType) {
-  const id = user.uid;
-  remoteUsers[id] = user;
-  subscribe(user, mediaType);
-}
-
-/*
- * Remove the user specified from the channel in the local interface.
- *
- * @param  {string} user - The {@link  https://docs.agora.io/en/Voice/API%20Reference/web_ng/interfaces/iagorartcremoteuser.html| remote user} to remove.
- */
-function handleUserUnpublished(user, mediaType) {
-  if (mediaType === "video") {
-    const id = user.uid;
-    delete remoteUsers[id];
-    $(`#player-wrapper-${id}`).remove();
-  }
-}
+/**
+ * Retrieve which codec the user chose from the Advanced Settings dropdown.
+*/
 function getCodec() {
   var radios = document.getElementsByName("radios");
   var value;

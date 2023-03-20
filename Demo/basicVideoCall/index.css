@@ -84,3 +84,9 @@
     padding-right: 4.5rem
   }
 }
+
+video {
+  width: 100%;
+  max-height: 100%;
+}
+

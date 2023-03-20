@@ -1,40 +1,41 @@
-# Sample projects for Agora RTC Web SDK 4.x
+# Video call demo converted to Daily from Agora RTC Web SDK 4.x
 
 ## Overview
 
-This repository contains sample projects using the Agora RTC Web SDK 4.x.
+This repository contains demo code that was originally using the Agora RTC Web SDK 4.x, converted to Daily's video call API.
 
-### How to run the sample projects
+![Screenshot of a basic call demo converted to Daily from Agora](screenshot.png)
 
-#### Prerequisites
+## Steps to run
 
-You need a supported browser to run the sample projects. See [Product Overview](https://docs.agora.io/en/Interactive%20Broadcast/product_live?platform=Web#compatibility) for a list of supported browsers.
+### Sign up for Daily and create a room
 
-#### Steps to run
+* Sign up for a [free Daily account](https://dashboard.daily.co/signup).
+* [Create a Daily room](https://dashboard.daily.co/rooms/create) in your Daily developer dashboard.
+  * If you'd like to not specify a meeting token for this demo, make sure the room privacy is set to "Public" on the creation page.
+* Click on your newly created room name and copy the room URL
+
+
+### Run the demo
+
+In the terminal, run the following commands:
 
 ```
+git clone git@github.com:daily-demos/agora-daily-conversion.git
+cd agora-daily-conversion
 npm i && npm run demo:dev
 ````
 
-Click on the demo you want to run.
+Open the URL shown in your terminal using your chosen browser to run the demo application.
 
-In the demo page, enter your Agora App ID, token, and channel name and join the channel.
-   - See [Get Started with Agora](https://docs.agora.io/en/Agora%20Platform/get_appid_token) to learn how to get an App ID and token. You can get a temporary access token to quickly try out this sample project.
-   - The channel name must be the same as the channel ID used to generate the token.
+Click on the demo you want to run (currently a single demo is available).
 
-### How to run the sample projects
-
-#### Prerequisites
-
-- You need a supported browser to run the sample projects. See [Product Overview](https://docs.agora.io/en/Interactive%20Broadcast/product_live?platform=Web#compatibility) for a list of supported browsers.
-- [npm](https://www.npmjs.com/)
-
+On the demo page, enter your Daily room URL, optional [Daily meeting token](https://docs.daily.co/guides/privacy-and-security/meeting-tokens), and optional name.
 
 ## Reference
 
-- [Web SDK 4.x Product Overview](https://docs.agora.io/en/Interactive%20Broadcast/product_live?platform=Web)
-- [Web SDK 4.x API Reference](https://docs.agora.io/en/Interactive%20Broadcast/API%20Reference/web_ng/index.html)
-- [Online demo deployed from this repo](https://webdemo.agora.io/)
+- [`daily-js` reference documentation](https://docs.daily.co/reference/daily-js)
+- [Understanding calls with Daily's dashboard](https://docs.daily.co/guides/architecture-and-monitoring/experiment-in-the-dashboard)
 
 ## Feedback
 

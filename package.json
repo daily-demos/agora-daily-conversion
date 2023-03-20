@@ -4,8 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "demo:dev": "nodemon ./scripts/dev-demo.js",
-    "demo:del-sso": "node ./scripts/del-demo-sso.js"
+    "demo:dev": "nodemon ./scripts/dev-demo.js"
   },
   "devDependencies": {
     "express": "^4.18.2",
